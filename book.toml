@@ -1,8 +1,9 @@
 [book]
-authors = ["wngr"]
+authors = ["Oliver Wangler <oliver@wngr.de>"]
 language = "en"
 multilingual = false
 src = "src"
+description = "Persistent dumps of some of the thoughts that crossed my mind"
 title = "wngr"
 
 [rust]
@@ -10,8 +11,13 @@ edition = "2018"
 
 [build]
 build-dir = "public"
-create-missing = false
-
 
 [output.html]
 default-theme = "coal"
+git-repository-url = "https://github.com/wngr/wngr.github.io/tree/main/src"
+
+[output.html.print]
+enable = false
+
+[output.html.playground]
+line-numbers = true

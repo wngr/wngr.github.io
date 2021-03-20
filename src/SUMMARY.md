@@ -1,3 +1,7 @@
 # Summary
 
-- [Chapter 1](./chapter_1.md)
+[Hello, World!](./hello_world.md)
+[About](./about.md)
+
+----
+

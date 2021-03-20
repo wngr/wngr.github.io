@@ -17,7 +17,9 @@ jobs:
             default: true
       - name: Install mdbook
         run: cargo install mdbook --version 0.4.7
-      - name: Build mdbook
+      - name: mdbook test
+        run: mdbook test
+      - name: mdbook build
         run: mdbook build
       - name: Deploy
         uses: peaceiris/actions-gh-pages@bbdfb200618d235585ad98e965f4aafc39b4c501
