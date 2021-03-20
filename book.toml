@@ -1,0 +1,17 @@
+[book]
+authors = ["wngr"]
+language = "en"
+multilingual = false
+src = "src"
+title = "wngr"
+
+[rust]
+edition = "2018"
+
+[build]
+build-dir = "public"
+create-missing = false
+
+
+[output.html]
+default-theme = "coal"
