@@ -3,7 +3,7 @@ authors = ["Oliver Wangler <oliver@wngr.de>"]
 language = "en"
 multilingual = false
 src = "src"
-description = "Persistent dumps of some of the thoughts that crossed my mind"
+description = "My personal notes. Mostly about programming."
 title = "wngr"
 
 [rust]
