@@ -170,7 +170,8 @@ programmer.  There are exactly two kind of errors:</p>
 </ol>
 <p>This post is about the latter: What happens exactly if we call <code>panic!()</code> in a Rust program, which options are there to
 modify and influence this behaviour, and what are the caveats? This write-up is non-exhaustive, but highlights the
-noteworthy points that helped me understand better. Platform specific nuances are not considered.</p>
+noteworthy points that helped me understand it better. Platform specific nuances are not considered, if they are not
+necessary to understand.</p>
 <p>Panics are commonly used to enforce an invariant of a program, which must not be broken and is completely unexpected by
 the application's logic. For further considerations when to use panics or not, see this
 <a href="https://doc.rust-lang.org/book/ch09-03-to-panic-or-not-to-panic.html">section</a> in the Rust book.</p>
@@ -185,7 +186,7 @@ println!(&quot;Nobody prints me :-(&quot;);
 <p>The argument passed to the <code>panic!</code> macro is printed, and further execution is stopped. In the following, we will trace
 what just happened.</p>
 <h3 id="the-panic-macro"><a class="header" href="#the-panic-macro">The <code>panic!</code> macro</a></h3>
-<p>The panic macro is defined in <a href="https://doc.rust-lang.org/src/std/macros.rs.html#12-18">std</a>:</p>
+<p>The <code>panic!</code> macro is defined in <a href="https://doc.rust-lang.org/src/std/macros.rs.html#12-18">std</a>:</p>
 <pre><code class="language-rust no_run noplayground ignore">macro_rules! panic {
     () =&gt; ({ $crate::panic!(&quot;explicit panic&quot;) });
     ($msg:expr $(,)?) =&gt; ({ $crate::rt::begin_panic($msg) });
@@ -194,8 +195,8 @@ what just happened.</p>
     });
 }
 </code></pre>
-<p>So it either accepts a string literal with formatting args (like <code>format!</code>), or an object. The object needs to fulfill
-the <code>Any + Send</code> trait bounds to be able to call
+<p>So it either accepts a string literal with formatting args (like <code>format!</code>), an object, or no argument at all (fallback
+to a default string literal). The object needs to fulfill the <code>Any + Send</code> trait bounds to be able to call
 <a href="https://github.com/rust-lang/rust/blob/507bff92fadf1f25a830da5065a5a87113345163/library/std/src/panicking.rs#L513-L521"><code>begin_panic</code></a>:</p>
 <pre><code class="language-rust no_run noplayground ignore">pub fn begin_panic&lt;M: Any + Send&gt;(msg: M) -&gt; ! {
     if cfg!(feature = &quot;panic_immediate_abort&quot;) {
@@ -208,14 +209,14 @@ the <code>Any + Send</code> trait bounds to be able to call
     });
 </code></pre>
 <p>Interesting, with the <code>panic_immediate_abort</code> feature set, the program immediately aborts without any further actions.
-This is not to be confused with the <code>panic = &quot;abort&quot;</code> setting in <code>Cargo.toml</code>, which sets the panic abort runtime. This
+This is not to be confused with the <code>panic = &quot;abort&quot;</code> setting in <code>Cargo.toml</code>, which sets the <code>panic_abort</code> runtime. This
 is used in order to get really tiny binaries. You need to
 <a href="https://github.com/rust-lang/rust/issues/54981#issuecomment-443369450">compile</a> Rust's std library yourself with said 
 feature flag set in order to use it.</p>
 <h3 id="panic-hook"><a class="header" href="#panic-hook">Panic hook</a></h3>
 <p><code>rust_panic_with_hook</code> will do some checking for recursive panics (it will terminate immediately in this case), and
-execute the panic hook, before dispatching to the panic runtime to unwind. Users can set a custom panic hook, which is
-executed for every panic, with <code>std::panic::set_hook</code>. This is a global resource, so last writer wins.</p>
+execute the panic hook, before dispatching to the panic runtime to unwind (or abort). Users can set a custom panic hook,
+which is executed for every panic, with <code>std::panic::set_hook</code>. This is a global resource, so last writer wins.</p>
 <pre><pre class="playground"><code class="language-rust should_panic edition2018">
 <span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
@@ -225,14 +226,14 @@ executed for every panic, with <code>std::panic::set_hook</code>. This is a glob
 panic!();
 <span class="boring">}
 </span></code></pre></pre>
-<p>The <code>PanicInfo</code> type propagates meta information of the panic (location, payload or message; more on that later). Any
-custom set panic hooks can be unset by <code>std::panic::take_hook()</code> which will leave Rust's default panic hook in place.</p>
+<p>The <code>PanicInfo</code> type propagates meta information of the panic (location, payload or message). Any custom set panic hooks
+can be unset by <code>std::panic::take_hook()</code> which will leave Rust's default panic hook in place.</p>
 <h3 id="panic-runtime"><a class="header" href="#panic-runtime">Panic runtime</a></h3>
-<p>After the panic hook has been executed, a FFI function<sup class="footnote-reference"><a href="#1">2</a></sup> is called:</p>
+<p>After control flow returned from the panic hook, a FFI function<sup class="footnote-reference"><a href="#1">2</a></sup> is called:</p>
 <pre><code class="language-rust no_run noplayground ignore">fn __rust_start_panic(payload: *mut &amp;mut dyn BoxMeUp) -&gt; u32;
 </code></pre>
-<p>This is a native interface, because rustc will make sure that user chosen panic runtime is linked against after
-compilation.</p>
+<p>This is a native interface, because rustc will make sure that user chosen panic runtime is linked against after the
+compilation step.</p>
 <p>Rust provides two panic runtimes: <code>panic_abort</code> and <code>panic_unwind</code>. <code>panic_abort</code> just aborts the program (via a
 platform specific syscall, e.g. <code>libc::abort()</code>) and can be enabled in <code>Cargo.toml</code>:</p>
 <pre><code class="language-toml">[profile.dev]
@@ -244,42 +245,44 @@ panic = &quot;abort&quot;
 <p>The default is
 <a href="https://github.com/rust-lang/rust/blob/89882388d931d2e4d0d30c73fc1aa9c56f4df110/library/panic_unwind/src/lib.rs#L1-L12"><code>panic_unwind</code></a>,
 which implements platform specific stack unwinding: In general, an unwinder walks the stack from top to bottom, where
-for each frame a so-called &quot;personality routine&quot; is called. This routine determines for the individual stack frame,
-which actions to take to handle an exception. If a handler frame has been found (so basically a catch block), the
-cleanup phase begins, where for each stack frame a &quot;landing pad&quot; is generated, which runs destructors, frees memory etc.
-Once the stack has been unwound, control is transferred to the handler frame.  If no handler frame is found, the process
-is terminated. This is not unique to Rust, but behaviour of the <a href="https://llvm.org/docs/ExceptionHandling.html#overview">LLVM
+for each frame a so-called &quot;personality routine&quot; is called (those are provided by this runtime). This routine determines
+for the individual stack frame, which actions to take to handle an exception. If a handler frame has been found (so
+basically a catch block), the cleanup phase begins, where for each stack frame a &quot;landing pad&quot; is generated, which runs
+destructors, frees memory etc. Once the stack has been unwound, control is transferred to the handler frame. If no
+handler frame was found, the process is terminated. This is not unique to Rust, but behaviour of the <a href="https://llvm.org/docs/ExceptionHandling.html#overview">LLVM
 backend</a>.</p>
 <h3 id="catching-a-panic"><a class="header" href="#catching-a-panic">Catching a panic</a></h3>
-<p>With the <code>panic_unwind</code> runtime, a panic in a thread triggers the unwinding of the stack. After the stack has been
-unwound, and no handler frame (catch block, see above) has been found, the process is terminated.  The Rust standard
-library provides a mechanism to &quot;catch&quot; a panic after the stack has been unwound: <code>std::panic::catch_unwind</code>, which takes
-a closure that might potentially panic, and returns a <code>Result&lt;T, Box&lt;dyn Any + Send + 'static&gt;&gt;</code>. This eventually ends
-up in the compiler intrinsics, where LLVM instructions for a try-catch block are fabricated (for GNU, see
+<p>With the <code>panic_unwind</code> runtime, a panic triggers the unwinding of the stack. After the stack has been unwound, and no
+handler frame (catch block, see above) has been found, the process is terminated.  The Rust standard library provides a
+mechanism to &quot;catch&quot; a panic after the stack has been unwound: <code>std::panic::catch_unwind</code>, which takes a closure that
+might potentially panic, and returns a <code>Result&lt;T, Box&lt;dyn Any + Send + 'static&gt;&gt;</code>. This eventually ends up in the
+compiler intrinsics, where LLVM instructions for a try-catch block are fabricated (for GNU, see
 <a href="https://github.com/rust-lang/rust/blob/master/compiler/rustc_codegen_llvm/src/intrinsic.rs#L537-L542">here</a>). With
 that, <code>std::panic::catch_unwind</code> is able to catch a panic, after the stack has been safely unwound.</p>
 <p>But why even try to catch a panic at all, given that it's considered a unrecoverable error? There are a couple of
 potential motivations: supervision of third party (library) code, robustness concerns (think safety critical systems),
-or managing of thread pools (for example in async runtimes). The canonical example of this is
-<a href="https://doc.rust-lang.org/src/std/thread/mod.rs.html#473-475"><code>std::thread</code></a>: Any panics encountered in a spawned
-thread are unwound, after which the (OS) thread exits. The <code>JoinHandle</code> returns from the thread's <code>spawn</code> method will
-yield the panic, if any happened. <code>tokio::task::spawn</code> took a similar approach (sans the OS thread exit, of course).</p>
+or managing of thread pools (for example in async runtimes). The canonical example of this (one where the motivation of
+Rust's creators is well visible) is <a href="https://doc.rust-lang.org/src/std/thread/mod.rs.html#473-475"><code>std::thread</code></a>: Any
+panics encountered in a spawned thread are unwound, after which the (OS) thread exits. The <code>JoinHandle</code> returns from the
+thread's <code>spawn</code> method will carry the panic, if any happened. <code>tokio::task::spawn</code> took a similar approach (sans the OS
+thread exit, of course).</p>
 <p><code>std::panic::resume_unwind</code> provides a way to trigger a panic without invoking the panic hook. If invoked with a panic
 caught by <code>std::panic::catch_unwind</code>, the panic hook has been already executed for said panic, and the stack unwound.
 The stack will be unwound again with <code>resume_unwind</code>, but this time without any catch blocks (if not nested with another
 <code>catch_unwind</code>).</p>
 <p>Note that all types passed into <code>catch_unwind</code> need to be
 <a href="https://doc.rust-lang.org/std/panic/trait.UnwindSafe.html"><code>UnwindSafe</code></a>. When used only from within safe Rust code,
-problematic is only shared mutable state, which could violate application level invariants.</p>
+problematic is only shared mutable state, which could violate application level invariants. More considerations apply if
+you interface with foreign code.</p>
 <h3 id="reacting-to-panics-in-application-level-code"><a class="header" href="#reacting-to-panics-in-application-level-code">Reacting to panics in application level code</a></h3>
 <p>Writing applications in Rust, I think it's advisable to stick to the recommendations of the Rust core team regarding
 error handling<sup class="footnote-reference"><a href="#2">3</a></sup>. Panics should be used as a last resort for non-recoverable errors. The logical conclusion from that
 is to always use the <code>panic_abort</code> runtime, so that any panic in any thread will bring down the whole process. However,
-it's advisable to have some sort of shutdown procedure (close database connections, flush to disk, etc.). This can be
-implemented by placing a custom panic hook with <code>std::panic::set_hook</code><sup class="footnote-reference"><a href="#3">4</a></sup>. As long as the closure passed to the hook
-finishes all work synchronously, we can stick with the <code>panic_abort</code> runtime; if we can only signal the shutdown to
-other threads and then yield, we obviously have to use the <code>panic_unwind</code> runtime -- otherwise the program would
-immediately exit after the panic hook returns.</p>
+it's good to have some sort of shutdown procedure (close database connections, flush to disk, etc.) to orderly bring
+down your application (if needed). This can be implemented by placing a custom panic hook with
+<code>std::panic::set_hook</code><sup class="footnote-reference"><a href="#3">4</a></sup>. As long as the closure passed to the hook finishes all work synchronously, we can stick with
+the <code>panic_abort</code> runtime; if we can only signal the shutdown to other threads and then yield, we obviously have to use
+the <code>panic_unwind</code> runtime -- otherwise the program would immediately exit after the panic hook returns.</p>
 <hr />
 <h4 id="footnotes"><a class="header" href="#footnotes">Footnotes</a></h4>
 <div class="footnote-definition" id="0"><sup class="footnote-definition-label">1</sup>
