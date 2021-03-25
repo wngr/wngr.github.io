@@ -35,6 +35,11 @@ macro_rules! panic {
 So it either accepts a string literal with formatting args (like `format!`), an object, or no argument at all (fallback
 to a default string literal). The object needs to fulfill the `Any + Send` trait bounds to be able to call
 [`begin_panic`](https://github.com/rust-lang/rust/blob/507bff92fadf1f25a830da5065a5a87113345163/library/std/src/panicking.rs#L513-L521):
+
+> **Update for Rust 1.51.0:**
+> Starting with 1.51.0, the `panic!` macro only takes `String` or `&str` payload. If you want to pass any object, you
+> should use `std::panic::panic_any` instead, which will directly call `begin_panic` (see below):
+
 ```rust,no_run,noplayground,ignore
 pub fn begin_panic<M: Any + Send>(msg: M) -> ! {
     if cfg!(feature = "panic_immediate_abort") {
