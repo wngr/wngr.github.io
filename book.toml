@@ -15,6 +15,7 @@ build-dir = "public"
 [output.html]
 default-theme = "coal"
 git-repository-url = "https://github.com/wngr/wngr.github.io/tree/main/src"
+cname = "0xd.org"
 
 [output.html.print]
 enable = false
