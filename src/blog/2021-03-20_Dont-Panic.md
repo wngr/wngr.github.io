@@ -137,8 +137,6 @@ the `panic_unwind` runtime -- otherwise the program would immediately exit after
 
 ----
 
-#### Footnotes
-
 [^0]: This is a runnable snippet, so you can click on the play button above.
 
 [^1]: If you're curious about the type of `payload`, check out [this
