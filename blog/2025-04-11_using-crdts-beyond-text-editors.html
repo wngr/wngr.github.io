@@ -155,76 +155,26 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="using-crdts-beyond-text-editors"><a class="header" href="#using-crdts-beyond-text-editors">Using CRDTs Beyond Text Editors</a></h1>
-<p><a href="https://www.youtube.com/watch?v=4QkLD7JhD_I">Video Recording</a> | <a href="https://github.com/helsing-ai/talks/blob/master/using-crdts-beyond-text-editors/using-crdts-beyond-text-editors.pdf">Slides</a></p>
+<p><a href="https://www.youtube.com/watch?v=4QkLD7JhD_I">Video Recording</a> |
+<a href="https://github.com/helsing-ai/talks/blob/master/using-crdts-beyond-text-editors/using-crdts-beyond-text-editors.pdf">Slides</a></p>
 <hr />
-<p>I recently gave a talk on Conflict-free Replicated Data Types (CRDTs), and one of the biggest
-takeaways was that CRDTs are useful for far more than just building collaborative text editors. When
-people first hear about these “fancy data structures,” they often imagine real-time shared docs like
-Google Docs or Etherpad. However, the potential of CRDTs goes beyond text fields into realms like
-distributed databases, contact lists, and pretty much any scenario where we want local-first and
-eventually consistent data.</p>
-<p>In the following, there's an extremely condensed overview of my talk:</p>
-<ol>
-<li>A quick refresher on what CRDTs are</li>
-<li>Why they’re so great for building decentralized or partially offline systems</li>
-<li>The difference between operation-based and delta-based CRDTs</li>
-<li>Some real-world Rust libraries (Automerge, Yrs)</li>
-<li>How we’re exploring a specialized delta-based CRDT called “DSON”</li>
-</ol>
-<p>So let’s untangle it all!</p>
-<hr />
-<h2 id="crdts-in-a-nutshell"><a class="header" href="#crdts-in-a-nutshell">CRDTs in a Nutshell</a></h2>
-<p>CRDT stands for “Conflict-free Replicated Data Type.” The short story is that multiple nodes in a
-distributed system (like your laptop and phone) each keep a copy of some data structure. You don’t
-need a central server or a consensus algorithm (like Raft) to coordinate changes. Instead, each node
-updates its local data independently and passes the changes around asynchronously. Once all nodes
-have seen all updates, they collectively reach the same final state—okay, big claim, but that’s what
-the “conflict-free” part is all about. CRDTs encode concurrency in such a way that merges are
-deterministic.</p>
-<p>An example everyone knows is text editing: if two users both type into the same document offline,
-the CRDT merges those simultaneous edits into a single “best-effort” result. But as soon as you
-realize that text editing is just one example of a shared data structure, you see why CRDTs can
-handle so many other domain-specific workloads—like to-do lists, graphs, game state, even nested
-JSON objects.</p>
-<hr />
-<h2 id="operation-based-crdts"><a class="header" href="#operation-based-crdts">Operation-Based CRDTs</a></h2>
-<p>The first CRDT approach to highlight is often called “op-based” or “operation-based.” Most
-mainstream Rust libraries take this route:</p>
-<ul>
-<li>They track each change as an operation in a (conceptually) single-writer append-only log.</li>
-<li>Peers exchange logs over the network.</li>
-<li>Once you apply all the operations, you (eventually) converge on the same state.</li>
-</ul>
-<h3 id="automerge--yrs"><a class="header" href="#automerge--yrs">Automerge &amp; Yrs</a></h3>
-<p>Two notable op-based CRDT libraries for Rust are:<br />
-• [Automerge] – Created by Martin Kleppmann &amp; collaborators. It has a somewhat low-level API, but
-also provides higher-level procedural macros (via <code>auto-surgeon</code>) that
-help map CRDT objects to native Rust structs.<br />
-• [Yrs] – A Rust port of the Yjs library, tuned for text editing use cases. It includes special data
-types for collaborative text, plus built-in functions for partial log synchronization.</p>
-<p>Both libraries hide a lot of complex concurrency logic. You typically just mutate a local data
-structure (like “insert a record” or “append some text”) and call a sync method that merges your
-changes with a remote peer’s changes. If you’re building a simple collaborative feature and have
-decent network connectivity, these libraries let you prototype in an afternoon.</p>
-<hr />
-<h2 id="delta-based-crdts"><a class="header" href="#delta-based-crdts">Delta-Based CRDTs</a></h2>
-<p>While op-based CRDTs tend to be simpler for well-connected systems, they aren’t always optimal. In
-highly constrained networks (think intermittent connectivity, very high latency, ultra-low
-bandwidth), shipping around entire operation logs can become impractical. That’s where delta-based
-CRDTs step in. Instead of replicating an ever-growing log, a delta-based approach sends only minimal
-“deltas” and the causal metadata needed to merge them.</p>
-<h3 id="specifying-the-deltas"><a class="header" href="#specifying-the-deltas">Specifying the Deltas</a></h3>
-<p>The magic is in how these deltas handle concurrency and partial info. In an ideal scenario, if your
-device only needs the latest N changes, you can just ask for those N relevant “deltas.” No more
-dragging along the entire log from the beginning of time. It’s kind of like a more direct expression
-of “Here’s exactly what I changed,” rather than “Here’s the entire historical record—figure out
-what’s new.”</p>
-<h3 id="dson-a-delta-crdt-for-json"><a class="header" href="#dson-a-delta-crdt-for-json">DSON: A Delta CRDT for JSON</a></h3>
-<p>For a more specialized form of delta-based CRDT, we’ve been experimenting with something called
-DSON. It applies delta semantics to a JSON-like data model (nested arrays, maps, etc.). The big win
-is that you can send partial updates—perfect for devices that can’t handle big payloads or are
-rarely online. Another plus is that DSON avoids “tombstones” (metadata that grows with every
-insertion/deletion over time), a known challenge in many CRDT designs.</p>
+<p>I recently gave a talk on Conflict-free Replicated Data Types (CRDTs) at the
+2025 <a href="https://www.rustikon.dev/">Rustikon</a> conference in Warsaw 2025.</p>
+<p>The talk explores how Conflict-free Replicated Data Types (CRDTs) can be used
+for much more than just collaborative text editing. It begins by highlighting
+the general principles of CRDTs—distributed systems that synchronize data
+automatically without a central server or a consensus protocol like Raft.
+While text editing has emerged as the most popular
+example, CRDTs are equally valuable for general-purpose state sharing between
+applications (think JSON semantics).</p>
+<p>From there, the talk dives into two main approaches for implementing CRDTs.
+Operation-based CRDTs rely on replicating a single-writer append-only log,
+making them straightforward for well-connected systems where logs are easy to
+share. However, for networks with limited bandwidth or intermittent
+connectivity, delta-based CRDTs allow for sending only minimal changes. The talk
+then explores this method’s advantages for constrained environments.</p>
+<p>The third part of the talk is about API considerations exposing impartial and/or
+potentially conflicted data to domain experts without bothering them too much.</p>
 <hr />
 <h2 id="literature"><a class="header" href="#literature">Literature</a></h2>
 <ol>
@@ -233,7 +183,7 @@ insertion/deletion over time), a known challenge in many CRDT designs.</p>
 <li>Liangrun Da &amp; Martin Kleppmann, “Extending JSON CRDTs with Move Operations,” PaPoC ’24</li>
 <li>Paulo Sérgio Almeida, “Approaches to Conflict-free Replicated Data Types” (2023)</li>
 <li>Frédéric Guidec, Yves Mahéo, Camille Noûs, “Supporting Conflict-free Replicated Data Types in Opportunistic Networks” (2022)</li>
-<li>A. Rinberg et al., "DSON: JSON CRDT using delta-mutations for document stores" (2022)</li>
+<li>Rinberg et al., "DSON: JSON CRDT using delta-mutations for document stores" (2022)</li>
 </ol>
 
                     </main>
