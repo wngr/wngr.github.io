@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>2021-03-24 Painless Cross-Compilation of Rust Crates - wngr</title>
+        <title>2025-04-11 Using CRDTs beyond Text Editors - wngr</title>
 
 
         <!-- Custom HTML head -->
@@ -154,118 +154,97 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="painless-rust-cross-compilation"><a class="header" href="#painless-rust-cross-compilation">Painless Rust Cross-Compilation</a></h1>
-<h3 id="rusts-cross"><a class="header" href="#rusts-cross">Rust's <code>cross</code></a></h3>
-<p>Rust is big on developer productivity: The tooling provided to get started with Rust development <em>just works</em>, be it
-<code>cargo</code>, <code>rustup</code>, or <code>clippy</code>. Another tool is in the toolbox is <a href="https://github.com/rust-embedded/cross">cross</a>, which
-lets you "magically" run tests or compile for other <a href="https://rust-lang.github.io/rustup-components-history/">build
-targets</a>. Under the hood, cross provides a set of docker
-containers (one for each supported target) containing a properly set up cross compilation toolchain and execution
-environment; for example for
-<a href="https://github.com/rust-embedded/cross/blob/master/docker/Dockerfile.arm-unknown-linux-gnueabihf"><code>arm-unknown-linux-gnueabihf</code></a>,
-this includes the <code>arm-linux-gnueabihf-gcc</code> toolchain and <code>qemu-arm</code> for executing arm binaries.</p>
-<p>Obviously, it would be a pain to set up each of those toolchains correctly on your host, and very hard to ensure build
-reproducibility when collaborating.</p>
-<h3 id="docker-buildx"><a class="header" href="#docker-buildx"><code>docker buildx</code></a></h3>
-<p>In another ecosystem, <code>docker</code> is pushing its refactoring of the <code>docker build</code> subsystem
-<a href="https://github.com/moby/buildkit"><code>moby/buildkit</code></a> slowly to become the standard of recent <code>docker</code> versions. One of
-the notable additions is the additional of the <code>--platform</code> arg to <code>docker buildx</code>. Images can be created for multiple
-architectures like so<sup class="footnote-reference" id="fr-0-1"><a href="#footnote-0">1</a></sup>:</p>
-<pre><code class="language-shell">docker buildx --platform linux/amd64,linux/aarch64,windows/amd64 .
-</code></pre>
-<p>This generates a so-called <a href="https://www.docker.com/blog/multi-arch-build-and-images-the-simple-way/">multi-arch image</a>,
-where the image's manifest contains references to multiple images depending on the chosen architecture. Within the
-<code>Dockerfile</code>, the following arguments are exposed: <code>BUILDPLATFORM</code> and <code>TARGETPLATFORM</code>.</p>
-<h3 id="bringing-it-together"><a class="header" href="#bringing-it-together">Bringing it together</a></h3>
-<p>Given a Cargo project, I'd like to cross-compile to multiple targets with a single call to <code>docker buildx</code>:</p>
-<pre><code class="language-shell">docker buildx build --platform linux/amd64,linux/aarch64,windows/amd64 -o dist .
-</code></pre>
-<p>And this should yield:</p>
-<pre><code class="language-shell">~ tree dist
-dist
-├── linux_amd64
-│   ├── my_awesome_binary
-├── linux_arm64
-│   ├── my_awesome_binary
-└── windows_amd64
-    └── my_awesome_binary.exe
-</code></pre>
-<p>.. and here's the <code>Dockerfile</code> for this, with inlined comments:</p>
-<pre><code class="language-Dockerfile"># Usage from crate root:
-#   docker buildx build \
-#     --platform linux/amd64,linux/aarch64 \
-#     -f Dockerfile \
-#     -o dist .
-# This will put the resulting artefacts inside `./dist`.
-ARG CROSSVER=0.2.1
-
-# Poor man's mapping from buildx arch scheme to cargo
-FROM --platform=$BUILDPLATFORM rustembedded/cross:aarch64-unknown-linux-musl-${CROSSVER} AS build-linux-arm64
-ENV CARGO_BUILD_TARGET=aarch64-unknown-linux-musl
-FROM --platform=$BUILDPLATFORM rustembedded/cross:x86_64-unknown-linux-musl-${CROSSVER} AS build-linux-amd64
-ENV CARGO_BUILD_TARGET=x86_64-unknown-linux-musl
-FROM --platform=$BUILDPLATFORM rustembedded/cross:arm-unknown-linux-musleabi-${CROSSVER} AS build-linux-armv6
-ENV CARGO_BUILD_TARGET=arm-unknown-linux-musleabi
-FROM --platform=$BUILDPLATFORM rustembedded/cross:armv7-unknown-linux-musleabihf-${CROSSVER} AS build-linux-armv7
-ENV CARGO_BUILD_TARGET=armv7-unknown-linux-musleabihf
-FROM --platform=$BUILDPLATFORM rustembedded/cross:x86_64-pc-windows-gnu-${CROSSVER} AS build-windows-amd64
-ENV CARGO_BUILD_TARGET=x86_64-pc-windows-gnu
-
-# actual build image
-FROM --platform=$BUILDPLATFORM build-${TARGETOS}-${TARGETARCH}${TARGETVARIANT} AS crossbuild
-ENV     CARGO_HOME=/usr/local/cargo \
-        PATH=/usr/local/cargo/bin:$PATH
-ARG RUSTVER=1.51.0
-
-RUN curl https://sh.rustup.rs -sSf | sh -s -- \
-    --default-toolchain ${RUSTVER} \
-    --profile minimal \
-    --target ${CARGO_BUILD_TARGET} \
-    -y 
-
-# actual building
-FROM --platform=$BUILDPLATFORM crossbuild AS build
-ENV CARGO_BUILD_JOBS=8
-ARG TARGETPLATFORM
-ARG BUILDPLATFORM
-RUN echo "Building on $BUILDPLATFORM for $TARGETPLATFORM"
-ARG TARGET_BINARY
-
-WORKDIR /src
-COPY . .
-
-RUN cargo build --release
-
-# move created binary to a well known place, as there is no access to the
-# CARGO_BUILD_TARGET env var in the later extraction stage
-# .. would be great to have `cargo build --out-dir` already on stable ..
-RUN mkdir /out &amp;&amp; \
-    mv /src/target/$CARGO_BUILD_TARGET/release/* /out
-
-# create an empty image just with the built binary to export
-FROM scratch
-
-COPY --from=build /out/* .
-</code></pre>
-<p>Compared to other approaches, where one would use a shared cache for Cargo's intermediate artefacts (or sccache), I
-found this approach to be surprisingly well suited for CI setups, as building the image is parallelized and heavily
-cached by the Docker daemon, and quite maintainable, as there's only one build definition involved for all build
-targets.</p>
+                        <h1 id="using-crdts-beyond-text-editors"><a class="header" href="#using-crdts-beyond-text-editors">Using CRDTs Beyond Text Editors</a></h1>
+<p><a href="https://www.youtube.com/watch?v=4QkLD7JhD_I">Video Recording</a> | <a href="https://github.com/helsing-ai/talks/blob/master/using-crdts-beyond-text-editors/using-crdts-beyond-text-editors.pdf">Slides</a></p>
 <hr />
-<hr>
-<ol class="footnote-definition"><li id="footnote-0">
-<p>Yes, you read that right, even for Windows. <a href="#fr-0-1">↩</a></p>
-</li>
+<p>I recently gave a talk on Conflict-free Replicated Data Types (CRDTs), and one of the biggest
+takeaways was that CRDTs are useful for far more than just building collaborative text editors. When
+people first hear about these “fancy data structures,” they often imagine real-time shared docs like
+Google Docs or Etherpad. However, the potential of CRDTs goes beyond text fields into realms like
+distributed databases, contact lists, and pretty much any scenario where we want local-first and
+eventually consistent data.</p>
+<p>In the following, there's an extremely condensed overview of my talk:</p>
+<ol>
+<li>A quick refresher on what CRDTs are</li>
+<li>Why they’re so great for building decentralized or partially offline systems</li>
+<li>The difference between operation-based and delta-based CRDTs</li>
+<li>Some real-world Rust libraries (Automerge, Yrs)</li>
+<li>How we’re exploring a specialized delta-based CRDT called “DSON”</li>
 </ol>
+<p>So let’s untangle it all!</p>
+<hr />
+<h2 id="crdts-in-a-nutshell"><a class="header" href="#crdts-in-a-nutshell">CRDTs in a Nutshell</a></h2>
+<p>CRDT stands for “Conflict-free Replicated Data Type.” The short story is that multiple nodes in a
+distributed system (like your laptop and phone) each keep a copy of some data structure. You don’t
+need a central server or a consensus algorithm (like Raft) to coordinate changes. Instead, each node
+updates its local data independently and passes the changes around asynchronously. Once all nodes
+have seen all updates, they collectively reach the same final state—okay, big claim, but that’s what
+the “conflict-free” part is all about. CRDTs encode concurrency in such a way that merges are
+deterministic.</p>
+<p>An example everyone knows is text editing: if two users both type into the same document offline,
+the CRDT merges those simultaneous edits into a single “best-effort” result. But as soon as you
+realize that text editing is just one example of a shared data structure, you see why CRDTs can
+handle so many other domain-specific workloads—like to-do lists, graphs, game state, even nested
+JSON objects.</p>
+<hr />
+<h2 id="operation-based-crdts"><a class="header" href="#operation-based-crdts">Operation-Based CRDTs</a></h2>
+<p>The first CRDT approach to highlight is often called “op-based” or “operation-based.” Most
+mainstream Rust libraries take this route:</p>
+<ul>
+<li>They track each change as an operation in a (conceptually) single-writer append-only log.</li>
+<li>Peers exchange logs over the network.</li>
+<li>Once you apply all the operations, you (eventually) converge on the same state.</li>
+</ul>
+<h3 id="automerge--yrs"><a class="header" href="#automerge--yrs">Automerge &amp; Yrs</a></h3>
+<p>Two notable op-based CRDT libraries for Rust are:<br />
+• [Automerge] – Created by Martin Kleppmann &amp; collaborators. It has a somewhat low-level API, but
+also provides higher-level procedural macros (via <code>auto-surgeon</code>) that
+help map CRDT objects to native Rust structs.<br />
+• [Yrs] – A Rust port of the Yjs library, tuned for text editing use cases. It includes special data
+types for collaborative text, plus built-in functions for partial log synchronization.</p>
+<p>Both libraries hide a lot of complex concurrency logic. You typically just mutate a local data
+structure (like “insert a record” or “append some text”) and call a sync method that merges your
+changes with a remote peer’s changes. If you’re building a simple collaborative feature and have
+decent network connectivity, these libraries let you prototype in an afternoon.</p>
+<hr />
+<h2 id="delta-based-crdts"><a class="header" href="#delta-based-crdts">Delta-Based CRDTs</a></h2>
+<p>While op-based CRDTs tend to be simpler for well-connected systems, they aren’t always optimal. In
+highly constrained networks (think intermittent connectivity, very high latency, ultra-low
+bandwidth), shipping around entire operation logs can become impractical. That’s where delta-based
+CRDTs step in. Instead of replicating an ever-growing log, a delta-based approach sends only minimal
+“deltas” and the causal metadata needed to merge them.</p>
+<h3 id="specifying-the-deltas"><a class="header" href="#specifying-the-deltas">Specifying the Deltas</a></h3>
+<p>The magic is in how these deltas handle concurrency and partial info. In an ideal scenario, if your
+device only needs the latest N changes, you can just ask for those N relevant “deltas.” No more
+dragging along the entire log from the beginning of time. It’s kind of like a more direct expression
+of “Here’s exactly what I changed,” rather than “Here’s the entire historical record—figure out
+what’s new.”</p>
+<h3 id="dson-a-delta-crdt-for-json"><a class="header" href="#dson-a-delta-crdt-for-json">DSON: A Delta CRDT for JSON</a></h3>
+<p>For a more specialized form of delta-based CRDT, we’ve been experimenting with something called
+DSON. It applies delta semantics to a JSON-like data model (nested arrays, maps, etc.). The big win
+is that you can send partial updates—perfect for devices that can’t handle big payloads or are
+rarely online. Another plus is that DSON avoids “tombstones” (metadata that grows with every
+insertion/deletion over time), a known challenge in many CRDT designs.</p>
+<hr />
+<h2 id="literature"><a class="header" href="#literature">Literature</a></h2>
+<ol>
+<li>Shapiro et al., “Delta State Replicated Data Types” (2018)</li>
+<li>van der Linde et al., “Making δ-CRDTs Delta-Based” (2016)</li>
+<li>Liangrun Da &amp; Martin Kleppmann, “Extending JSON CRDTs with Move Operations,” PaPoC ’24</li>
+<li>Paulo Sérgio Almeida, “Approaches to Conflict-free Replicated Data Types” (2023)</li>
+<li>Frédéric Guidec, Yves Mahéo, Camille Noûs, “Supporting Conflict-free Replicated Data Types in Opportunistic Networks” (2022)</li>
+<li>A. Rinberg et al., "DSON: JSON CRDT using delta-mutations for document stores" (2022)</li>
+</ol>
+
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../blog/2021-04-06_Sniffing-into-Signal-Backups.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../about.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
-                            <a rel="next prefetch" href="../blog/2021-03-20_Dont-Panic.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../blog/2021-08-31_Introduction-Wasm-Threads.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <i class="fa fa-angle-right"></i>
                             </a>
 
@@ -275,11 +254,11 @@ targets.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../blog/2021-04-06_Sniffing-into-Signal-Backups.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../about.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 
-                    <a rel="next prefetch" href="../blog/2021-03-20_Dont-Panic.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../blog/2021-08-31_Introduction-Wasm-Threads.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <i class="fa fa-angle-right"></i>
                     </a>
             </nav>

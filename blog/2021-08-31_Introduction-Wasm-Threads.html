@@ -23,17 +23,18 @@
         <link rel="stylesheet" href="../fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="../highlight.css">
-        <link rel="stylesheet" href="../tomorrow-night.css">
-        <link rel="stylesheet" href="../ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
 
-        <!-- Provide site root to javascript -->
+        <!-- Provide site root and default themes to javascript -->
         <script>
-            var path_to_root = "../";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "coal";
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "navy";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc.js"></script>
@@ -43,8 +44,8 @@
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -58,7 +59,8 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
@@ -71,8 +73,8 @@
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -108,6 +110,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
@@ -155,20 +158,20 @@
 <p>Quite some introductions have been written how to get started compiling Rust to
 WebAssembly and using it in the browser. The inertia behind wasm threads however
 fell prey to the Spectre/Meltdown mitigation measures introduced in early
-2018<sup class="footnote-reference"><a href="#2">1</a></sup>. Fortunately, in the last 1.5 years the bits and pieces that make up
+2018<sup class="footnote-reference" id="fr-2-1"><a href="#footnote-2">1</a></sup>. Fortunately, in the last 1.5 years the bits and pieces that make up
 wasm threads were re-added to both Firefox and Chromium.</p>
 <p>Wasm threads are not a atomic thing like POSIX threads, but rather are made up
 of composable pieces. The main idea is simple really: Spawn wasm code into
 mulitple web workers, and give them a shared slice of memory -- what could
 possibly go wrong? Anyway, in order to synchronize access to the
-<code>SharedArrayBuffer</code><sup class="footnote-reference"><a href="#3">2</a></sup>, a set of atomic instructions<sup class="footnote-reference"><a href="#4">3</a></sup> was introduced.
+<code>SharedArrayBuffer</code><sup class="footnote-reference" id="fr-3-1"><a href="#footnote-3">2</a></sup>, a set of atomic instructions<sup class="footnote-reference" id="fr-4-1"><a href="#footnote-4">3</a></sup> was introduced.
 Those features are available for "cross origin isolated" websites, meaning that
 a set of custom headers must be provided while serving the top level document,
-and cross origin inclusions are restricted<sup class="footnote-reference"><a href="#5">4</a></sup>.</p>
+and cross origin inclusions are restricted<sup class="footnote-reference" id="fr-5-1"><a href="#footnote-5">4</a></sup>.</p>
 <p>Let's take it step-by-step, from a wasm module loaded into the main js context,
 over a wasm module loaded in a web worker, to a wasm module loaded in multiple
 web workers and them communicating via shared memory.</p>
-<p>Loading a wasm module on the browser's main thread is quite simple<sup class="footnote-reference"><a href="#6">5</a></sup> with the
+<p>Loading a wasm module on the browser's main thread is quite simple<sup class="footnote-reference" id="fr-6-1"><a href="#footnote-6">5</a></sup> with the
 right incantations of <code>wasm-bindgen</code>:</p>
 <pre><code class="language-rust ignore noplayground ignore">use wasm_bindgen::prelude::*;
 
@@ -201,7 +204,7 @@ pub fn greet(name: &amp;str) {
 &lt;html&gt;
 </code></pre>
 <p>Spawning the wasm module inside a web worker does not require any changes to the
-wasm module itself, just some glue code to spin up the <code>worker.js</code><sup class="footnote-reference"><a href="#7">6</a></sup>:</p>
+wasm module itself, just some glue code to spin up the <code>worker.js</code><sup class="footnote-reference" id="fr-7-1"><a href="#footnote-7">6</a></sup>:</p>
 <pre><code class="language-js">import init, { greet } from './pkg/wasm_hello_world.js';
 
 self.onmessage = async event =&gt; {
@@ -216,7 +219,7 @@ self.onmessage = async event =&gt; {
     &lt;/script&gt;
 </code></pre>
 <p>Now that we put that behind us, it get's more interesting with multiple
-workers<sup class="footnote-reference"><a href="#8">7</a></sup>. The basic workflow is:</p>
+workers<sup class="footnote-reference" id="fr-8-1"><a href="#footnote-8">7</a></sup>. The basic workflow is:</p>
 <ol>
 <li>Spawn workers.</li>
 <li>Initialize wasm module with a shared memory slice (<code>SharedArrayBuffer</code>)
@@ -278,33 +281,34 @@ that approach into larger js application; let alone trying to bundle it together
 with Webpack etc. In my next post, I'm going to introduce a library hiding all
 the dirty details behind a (hopefully) easy to use API.</p>
 <hr />
-<div class="footnote-definition" id="2"><sup class="footnote-definition-label">1</sup>
-<p><a href="https://blog.mozilla.org/security/2018/01/03/mitigations-landing-new-class-timing-attack/%5D">https://blog.mozilla.org/security/2018/01/03/mitigations-landing-new-class-timing-attack/</a></p>
-</div>
-<div class="footnote-definition" id="3"><sup class="footnote-definition-label">2</sup>
-<p><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer</a></p>
-</div>
-<div class="footnote-definition" id="4"><sup class="footnote-definition-label">3</sup>
-<p><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics</a></p>
-</div>
-<div class="footnote-definition" id="5"><sup class="footnote-definition-label">4</sup>
-<p><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#security_requirements">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#security_requirements</a></p>
-</div>
-<div class="footnote-definition" id="6"><sup class="footnote-definition-label">5</sup>
-<p><a href="https://github.com/wngr/wasm-hello-world/tree/master/main-context">https://github.com/wngr/wasm-hello-world/tree/master/main-context</a></p>
-</div>
-<div class="footnote-definition" id="7"><sup class="footnote-definition-label">6</sup>
-<p><a href="https://github.com/wngr/wasm-hello-world/tree/master/single-web-worker">https://github.com/wngr/wasm-hello-world/tree/master/single-web-worker</a></p>
-</div>
-<div class="footnote-definition" id="8"><sup class="footnote-definition-label">7</sup>
-<p><a href="https://github.com/wngr/wasm-hello-world/tree/master/multi-web-worker">https://github.com/wngr/wasm-hello-world/tree/master/multi-web-worker</a></p>
-</div>
-
+<hr>
+<ol class="footnote-definition"><li id="footnote-2">
+<p><a href="https://blog.mozilla.org/security/2018/01/03/mitigations-landing-new-class-timing-attack/%5D">https://blog.mozilla.org/security/2018/01/03/mitigations-landing-new-class-timing-attack/</a> <a href="#fr-2-1">↩</a></p>
+</li>
+<li id="footnote-3">
+<p><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer</a> <a href="#fr-3-1">↩</a></p>
+</li>
+<li id="footnote-4">
+<p><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics</a> <a href="#fr-4-1">↩</a></p>
+</li>
+<li id="footnote-5">
+<p><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#security_requirements">https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#security_requirements</a> <a href="#fr-5-1">↩</a></p>
+</li>
+<li id="footnote-6">
+<p><a href="https://github.com/wngr/wasm-hello-world/tree/master/main-context">https://github.com/wngr/wasm-hello-world/tree/master/main-context</a> <a href="#fr-6-1">↩</a></p>
+</li>
+<li id="footnote-7">
+<p><a href="https://github.com/wngr/wasm-hello-world/tree/master/single-web-worker">https://github.com/wngr/wasm-hello-world/tree/master/single-web-worker</a> <a href="#fr-7-1">↩</a></p>
+</li>
+<li id="footnote-8">
+<p><a href="https://github.com/wngr/wasm-hello-world/tree/master/multi-web-worker">https://github.com/wngr/wasm-hello-world/tree/master/multi-web-worker</a> <a href="#fr-8-1">↩</a></p>
+</li>
+</ol>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../about.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../blog/2025-04-11_using-crdts-beyond-text-editors.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
 
@@ -318,7 +322,7 @@ the dirty details behind a (hopefully) easy to use API.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../about.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../blog/2025-04-11_using-crdts-beyond-text-editors.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
 

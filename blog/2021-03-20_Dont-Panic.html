@@ -23,17 +23,18 @@
         <link rel="stylesheet" href="../fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="../highlight.css">
-        <link rel="stylesheet" href="../tomorrow-night.css">
-        <link rel="stylesheet" href="../ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
 
-        <!-- Provide site root to javascript -->
+        <!-- Provide site root and default themes to javascript -->
         <script>
-            var path_to_root = "../";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "coal";
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "navy";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc.js"></script>
@@ -43,8 +44,8 @@
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -58,7 +59,8 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
@@ -71,8 +73,8 @@
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -108,6 +110,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
@@ -165,7 +168,7 @@ necessary to understand.</p>
 <p>Panics are commonly used to enforce an invariant of a program, which must not be broken and is completely unexpected by
 the application's logic. For further considerations when to use panics or not, see this
 <a href="https://doc.rust-lang.org/book/ch09-03-to-panic-or-not-to-panic.html">section</a> in the Rust book.</p>
-<p>Let's consider a simple panic<sup class="footnote-reference"><a href="#0">1</a></sup>:</p>
+<p>Let's consider a simple panic<sup class="footnote-reference" id="fr-0-1"><a href="#footnote-0">1</a></sup>:</p>
 <pre><pre class="playground"><code class="language-rust should_panic edition2018"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
 </span>panic!("boom");
@@ -218,7 +221,7 @@ panic!();
 <p>The <code>PanicInfo</code> type propagates meta information of the panic (location, payload or message). Any custom set panic hooks
 can be unset by <code>std::panic::take_hook()</code> which will leave Rust's default panic hook in place.</p>
 <h3 id="panic-runtime"><a class="header" href="#panic-runtime">Panic runtime</a></h3>
-<p>After control flow returned from the panic hook, a FFI function<sup class="footnote-reference"><a href="#1">2</a></sup> is called:</p>
+<p>After control flow returned from the panic hook, a FFI function<sup class="footnote-reference" id="fr-1-1"><a href="#footnote-1">2</a></sup> is called:</p>
 <pre><code class="language-rust no_run noplayground ignore">fn __rust_start_panic(payload: *mut &amp;mut dyn BoxMeUp) -&gt; u32;</code></pre>
 <p>This is a native interface, because rustc will make sure that user chosen panic runtime is linked against after the
 compilation step.</p>
@@ -264,30 +267,31 @@ problematic is only shared mutable state, which could violate application level 
 you interface with foreign code.</p>
 <h3 id="reacting-to-panics-in-application-level-code"><a class="header" href="#reacting-to-panics-in-application-level-code">Reacting to panics in application level code</a></h3>
 <p>Writing applications in Rust, I think it's advisable to stick to the recommendations of the Rust core team regarding
-error handling<sup class="footnote-reference"><a href="#2">3</a></sup>. Panics should be used as a last resort for non-recoverable errors. The logical conclusion from that
+error handling<sup class="footnote-reference" id="fr-2-1"><a href="#footnote-2">3</a></sup>. Panics should be used as a last resort for non-recoverable errors. The logical conclusion from that
 is to always use the <code>panic_abort</code> runtime, so that any panic in any thread will bring down the whole process. However,
 it's good to have some sort of shutdown procedure (close database connections, flush to disk, etc.) to orderly bring
 down your application (if needed). This can be implemented by placing a custom panic hook with
-<code>std::panic::set_hook</code><sup class="footnote-reference"><a href="#3">4</a></sup>. As long as the closure passed to the hook finishes all work synchronously, we can stick with
+<code>std::panic::set_hook</code><sup class="footnote-reference" id="fr-3-1"><a href="#footnote-3">4</a></sup>. As long as the closure passed to the hook finishes all work synchronously, we can stick with
 the <code>panic_abort</code> runtime; if we can only signal the shutdown to other threads and then yield, we obviously have to use
 the <code>panic_unwind</code> runtime -- otherwise the program would immediately exit after the panic hook returns.</p>
 <hr />
-<div class="footnote-definition" id="0"><sup class="footnote-definition-label">1</sup>
-<p>This is a runnable snippet, so you can click on the play button above.</p>
-</div>
-<div class="footnote-definition" id="1"><sup class="footnote-definition-label">2</sup>
+<hr>
+<ol class="footnote-definition"><li id="footnote-0">
+<p>This is a runnable snippet, so you can click on the play button above. <a href="#fr-0-1">↩</a></p>
+</li>
+<li id="footnote-1">
 <p>If you're curious about the type of <code>payload</code>, check out <a href="https://rustc-dev-guide.rust-lang.org/panic-implementation.html#std-implementation-of-panic">this
-explanation</a>.</p>
-</div>
-<div class="footnote-definition" id="2"><sup class="footnote-definition-label">3</sup>
+explanation</a>. <a href="#fr-1-1">↩</a></p>
+</li>
+<li id="footnote-2">
 <p>The Rust Book has a very well written <a href="https://doc.rust-lang.org/book/ch09-00-error-handling.html">chapter</a> on error
-handling, which is worth a read.</p>
-</div>
-<div class="footnote-definition" id="3"><sup class="footnote-definition-label">4</sup>
+handling, which is worth a read. <a href="#fr-2-1">↩</a></p>
+</li>
+<li id="footnote-3">
 <p>For some inspiration to parse <code>PanicInfo</code>, check out the <a href="https://github.com/rust-lang/rust/blob/507bff92fadf1f25a830da5065a5a87113345163/library/std/src/panicking.rs#L180-L227">default hook in
-std</a>.</p>
-</div>
-
+std</a>. <a href="#fr-3-1">↩</a></p>
+</li>
+</ol>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">

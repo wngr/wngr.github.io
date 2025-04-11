@@ -23,17 +23,18 @@
         <link rel="stylesheet" href="../fonts/fonts.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" href="../highlight.css">
-        <link rel="stylesheet" href="../tomorrow-night.css">
-        <link rel="stylesheet" href="../ayu-highlight.css">
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
 
         <!-- Custom theme stylesheets -->
 
 
-        <!-- Provide site root to javascript -->
+        <!-- Provide site root and default themes to javascript -->
         <script>
-            var path_to_root = "../";
-            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "coal";
+            const path_to_root = "../";
+            const default_light_theme = "coal";
+            const default_dark_theme = "navy";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc.js"></script>
@@ -43,8 +44,8 @@
         <!-- Work around some values being stored in localStorage wrapped in quotes -->
         <script>
             try {
-                var theme = localStorage.getItem('mdbook-theme');
-                var sidebar = localStorage.getItem('mdbook-sidebar');
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
 
                 if (theme.startsWith('"') && theme.endsWith('"')) {
                     localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
@@ -58,7 +59,8 @@
 
         <!-- Set the theme before any content is loaded, prevents flash -->
         <script>
-            var theme;
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
             try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
             if (theme === null || theme === undefined) { theme = default_theme; }
             const html = document.documentElement;
@@ -71,8 +73,8 @@
 
         <!-- Hide / unhide sidebar before it is displayed -->
         <script>
-            var sidebar = null;
-            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
             if (document.body.clientWidth >= 1080) {
                 try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
                 sidebar = sidebar || 'visible';
@@ -108,6 +110,7 @@
                             <i class="fa fa-paint-brush"></i>
                         </button>
                         <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
                             <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
@@ -152,18 +155,18 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="sniffing-into-signal-backups"><a class="header" href="#sniffing-into-signal-backups">Sniffing into Signal Backups</a></h1>
-<p>For quite some time<sup class="footnote-reference"><a href="#0">1</a></sup> now the <a href="https://signal.org/">Signal</a> Android App offers encrypted backups. This is a
+<p>For quite some time<sup class="footnote-reference" id="fr-0-1"><a href="#footnote-0">1</a></sup> now the <a href="https://signal.org/">Signal</a> Android App offers encrypted backups. This is a
 comprehensive backup, which includes amongst others all message history, attachments, and most notably the app's key
 pair. Because of its focus much on UX in the app, and how it embeds into the Android ecosystem (reliance on Google Cloud
 Messaging, availability only in the Google Play Store, etc.), Signal experienced tremendous adaption in contrast to its
-competitors like <a href="https://element.io/">Element</a> -- Signal's premise is Security, not Privacy<sup class="footnote-reference"><a href="#1">2</a></sup>. The recent adoption
+competitors like <a href="https://element.io/">Element</a> -- Signal's premise is Security, not Privacy<sup class="footnote-reference" id="fr-1-1"><a href="#footnote-1">2</a></sup>. The recent adoption
 waves, mostly triggered by WhatsApp's ToS changes show, that users seemingly don't care about the technical details of
 the messager used -- WhatsApp also uses Signal's <a href="https://signal.org/docs/specifications/doubleratchet/">Double Ratchet
 Algorithm</a> to encrypt messages. The key differences between
 WhatsApp and Signal are: Signal's code base is open source (you have to trust them to run the
 <a href="https://github.com/signalapp/Signal-Server">server</a> code like they claim), and backing entity is a Nonprofit. Don't get
 me wrong, those are very relevant differences, but nothing ground-breaking in terms of privacy.</p>
-<p>Anyway, this post was supposed to be about how the backup of the Signal Android App is structured<sup class="footnote-reference"><a href="#2">3</a></sup>. We're going to
+<p>Anyway, this post was supposed to be about how the backup of the Signal Android App is structured<sup class="footnote-reference" id="fr-2-1"><a href="#footnote-2">3</a></sup>. We're going to
 decompose the backup file by writing a parser for it in Rust, layer by layer:</p>
 <p>The backup file itself is a binary blob, which is a sequence of Protobuf encoded messages:</p>
 <pre><code class="language-proto">message BackupFrame {
@@ -227,7 +230,7 @@ let init_vector: [u8; 16] = {
 derivation function. The resulting key is split, the first 32 bytes used as input for a hash based message
 authentication code (HMAC), the second 32 bytes as input for the encryption scheme. Lastly, we extract the
 initialization vector, which is used as a starting nonce later.
-The key is derived by using HMAC-based Extract-and-Expand Key Derivation Function (HKDF)<sup class="footnote-reference"><a href="#3">4</a></sup> with a nulled salt, and
+The key is derived by using HMAC-based Extract-and-Expand Key Derivation Function (HKDF)<sup class="footnote-reference" id="fr-3-1"><a href="#footnote-3">4</a></sup> with a nulled salt, and
 static info bytes:</p>
 <pre><code class="language-rust no_run noplayground ignore">fn derive_secrets(key: &amp;[u8]) -&gt; anyhow::Result&lt;[u8; 64]&gt; {
     let salt = [0u8; 32];
@@ -245,7 +248,7 @@ memory:</p>
 let mut frame = vec![0u8; frame_len];
 self.reader.read_exact(&amp;mut frame)?;</code></pre>
 <p>Next, the blob's authenticity is checked, whereas only the first 10 bytes of the derived hash are persisted in the
-file<sup class="footnote-reference"><a href="#4">5</a></sup>:</p>
+file<sup class="footnote-reference" id="fr-4-1"><a href="#footnote-4">5</a></sup>:</p>
 <pre><code class="language-rust no_run noplayground ignore">let their_mac = &amp;frame[frame.len() - 10..];
 self.hmac.update(&amp;frame[..frame.len() - 10]);
 let our_mac = self.hmac.finalize_reset().into_bytes();
@@ -279,26 +282,27 @@ let frame = model::BackupFrame::decode(&amp;frame[..read_to])?;</code></pre>
 messages into a database, exporting all attachments, etc..</p>
 <p>The full code of this can be found in <a href="https://github.com/wngr/signal-beagle">this repo</a>.</p>
 <hr />
-<div class="footnote-definition" id="0"><sup class="footnote-definition-label">1</sup>
+<hr>
+<ol class="footnote-definition"><li id="footnote-0">
 <p>The initial implementation in <a href="https://github.com/signalapp/Signal-Android/commit/24e573e537639f6f8ff40fd774cf9ff079bbacce">this
-commit</a>.</p>
-</div>
-<div class="footnote-definition" id="1"><sup class="footnote-definition-label">2</sup>
+commit</a>. <a href="#fr-0-1">↩</a></p>
+</li>
+<li id="footnote-1">
 <p>Over the years, Moxie outlined his stance on this several times. Examples include <a href="https://github.com/signalapp/Signal-Android/issues/127#issuecomment-13335689">this
 comment</a> and <a href="https://github.com/signalapp/Signal-Android/issues/281#issuecomment-21762482">this other
-comment</a>.</p>
-</div>
-<div class="footnote-definition" id="2"><sup class="footnote-definition-label">3</sup>
+comment</a>. <a href="#fr-1-1">↩</a></p>
+</li>
+<li id="footnote-2">
 <p>All observations are based on
-<a href="https://github.com/signalapp/Signal-Android/tree/d74e9f74103ad76eb7b5378e06fb789e7b365767"><code>d74e9f74103ad76eb7b5378e06fb789e7b365767</code></a>.</p>
-</div>
-<div class="footnote-definition" id="3"><sup class="footnote-definition-label">4</sup>
-<p><a href="https://tools.ietf.org/html/rfc5869">https://tools.ietf.org/html/rfc5869</a></p>
-</div>
-<div class="footnote-definition" id="4"><sup class="footnote-definition-label">5</sup>
-<p>I suppose this was done to save some bytes, but this opens the door for potential collision attacks.</p>
-</div>
-
+<a href="https://github.com/signalapp/Signal-Android/tree/d74e9f74103ad76eb7b5378e06fb789e7b365767"><code>d74e9f74103ad76eb7b5378e06fb789e7b365767</code></a>. <a href="#fr-2-1">↩</a></p>
+</li>
+<li id="footnote-3">
+<p><a href="https://tools.ietf.org/html/rfc5869">https://tools.ietf.org/html/rfc5869</a> <a href="#fr-3-1">↩</a></p>
+</li>
+<li id="footnote-4">
+<p>I suppose this was done to save some bytes, but this opens the door for potential collision attacks. <a href="#fr-4-1">↩</a></p>
+</li>
+</ol>
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
